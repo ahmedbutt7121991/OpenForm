@@ -15,3 +15,8 @@ Writing Code using **TERRAFORM** framework to implement different Test Case Sena
 ```
 Also to create Infrastrure easy and more professionally.
 ```
+### Terraform Commands
+* terraform init
+* terraform plan
+* terraform plan -out terraform-plan.out
+* terraform apply
