@@ -20,19 +20,9 @@ resource "openstack_networking_subnet_v2" "subnet_1" {
   network_id = "${openstack_networking_network_v2.network_1.id}"
   cidr       = "192.168.199.0/24"
   ip_version = 4
+  dns_nameservers = ["8.8.8.8", "8.8.4.4"]
 }
-# Creating Security Group for Network
-#resource "openstack_compute_secgroup_v2" "secgroup_1" {
-#  name        = "secgroup_1"
-#  description = "a security group"
-#
- # rule {
-  #  from_port   = 22
-   # to_port     = 22
-    #ip_protocol = "tcp"
-   # cidr        = "0.0.0.0/0"
-  #}
-#}
+
 # Creating Port for Network
 resource "openstack_networking_port_v2" "port_1" {
   name               = "port_1"
@@ -46,10 +36,17 @@ resource "openstack_networking_port_v2" "port_1" {
   }
 }
 
-#Creating a Keypair
-#resource "openstack_compute_keypair_v2" "ssh-key" {
-#  name = "ssh-key"
-#}
+
+# Adding Subnet to the Router Interface
+resource "openstack_networking_router_interface_v2" "router_interface_1" {
+  router_id = "${openstack_networking_router_v2.router_1.id}"
+  subnet_id = "${openstack_networking_subnet_v2.subnet_1.id}"
+}
+
+#Creating floating ip
+resource "openstack_networking_floatingip_v2" "floatip_1" {
+  pool = "public"
+}
 
 
 # Creating Instance Resource
@@ -64,18 +61,30 @@ resource "openstack_compute_instance_v2" "instance_1" {
   }
 }
 
-# Adding Subnet to the Router Interface
-resource "openstack_networking_router_interface_v2" "router_interface_1" {
-  router_id = "${openstack_networking_router_v2.router_1.id}"
-  subnet_id = "${openstack_networking_subnet_v2.subnet_1.id}"
+#Creating Resource for floating ip
+resource "openstack_compute_floatingip_associate_v2" "floatip_1" {
+  floating_ip = "${openstack_networking_floatingip_v2.floatip_1.address}"
+  instance_id = "${openstack_compute_instance_v2.instance_1.id}"
+
+
+
+  #Creation a SSH Connection to Access VM and Perform a test in Created VM
+    connection {
+      user     = "${var.SSH_USER_NAME}"
+      host     = "${openstack_networking_floatingip_v2.floatip_1.address}"
+      private_key = "${file(var.SSH_KEY_FILE)}"
+    }
+
+ provisioner "remote-exec" {
+    inline = [
+      "echo terraform executed > /tmp/foo",
+      "pwd",
+      "sudo yum -y update",
+      "sudo yum -y install nginx",
+      "sudo systemctl start nginx",
+      "sudo systemctl status nginx",
+    ]
+}
 }
 
-#Creating Floating IP Pool
-resource "openstack_compute_floatingip_v2" "floatip_1" {
-  pool = "public"
-}
-#Attaching floating ip to Instance
-resource "openstack_compute_floatingip_associate_v2" "floatip_1" {
-  floating_ip = "${openstack_compute_floatingip_v2.floatip_1.address}"
-  instance_id = "${openstack_compute_instance_v2.instance_1.id}"
-}
+
