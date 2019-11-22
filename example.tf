@@ -56,6 +56,7 @@ resource "openstack_compute_instance_v2" "instance_1" {
   image_name	= "${var.IMAGE_NAME}"
   flavor_name	= "${var.FLAVOR_NAME}"
   key_pair	= "${var.SSH_KEY_NAME}"
+  availability_zone = "${lookup(var.ZONE, var.AVAILABILITY_ZONES)}"
   network {
     port = "${openstack_networking_port_v2.port_1.id}"
   }
