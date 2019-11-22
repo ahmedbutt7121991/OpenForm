@@ -65,6 +65,7 @@ resource "openstack_compute_instance_v2" "instance_1" {
 resource "openstack_compute_floatingip_associate_v2" "floatip_1" {
   floating_ip = "${openstack_networking_floatingip_v2.floatip_1.address}"
   instance_id = "${openstack_compute_instance_v2.instance_1.id}"
+  wait_until_associated = "true"
 
 
 
@@ -75,16 +76,28 @@ resource "openstack_compute_floatingip_associate_v2" "floatip_1" {
       private_key = "${file(var.SSH_KEY_FILE)}"
     }
 
- provisioner "remote-exec" {
+  provisioner "file"{
+      source = "/home/osp_admin/OpenForm/nginx.repo"
+      destination = "/home/centos/nginx.repo"
+  }
+
+  provisioner "remote-exec" {
     inline = [
       "echo terraform executed > /tmp/foo",
       "pwd",
-      "sudo yum -y update",
+      "ls",
+      "sudo cat /etc/sysconfig/network-scripts/ifcfg-eth0",
+      "sudo ls /etc/yum.repos.d/",
+      "sudo cp nginx.repo /etc/yum.repos.d/",
+      "sudo yum-config-manager --enable nginx",
       "sudo yum -y install nginx",
       "sudo systemctl start nginx",
+      "sudo systemctl enable nginx",
       "sudo systemctl status nginx",
     ]
 }
+
+
 }
 
 
