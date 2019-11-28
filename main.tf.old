@@ -136,7 +136,20 @@ resource "openstack_networking_port_v2" "sub_port" {
   }
 }
 
+resource "openstack_networking_port_v2" "sub_port_simple" {
+  depends_on = [
+    "openstack_networking_subnet_v2.sub_subnet",
+  ]
 
+  name           = "sub_port_simple"
+  network_id     = "${openstack_networking_network_v2.sub_network.id}"
+  admin_state_up = "true"
+
+    fixed_ip {
+    subnet_id  =  "${openstack_networking_subnet_v2.sub_subnet.id}"
+    ip_address = "192.168.90.11"
+  }
+}
 
 #Adding subnets to router
 resource "openstack_networking_router_interface_v2" "parent_router_interface" {
@@ -162,7 +175,9 @@ resource "openstack_networking_trunk_v2" "trunk_1" {
 resource "openstack_networking_floatingip_v2" "vlan_floatip" {
   pool = "public"
 }
-
+resource "openstack_networking_floatingip_v2" "vlan_simple_floatip" {
+  pool = "public"
+}
 # Creating Instance Resource
 resource "openstack_compute_instance_v2" "vlanaware_instance_1" {
   name            = "vlanaware_instance_1"
@@ -174,6 +189,23 @@ resource "openstack_compute_instance_v2" "vlanaware_instance_1" {
   network {
     port = "${openstack_networking_trunk_v2.trunk_1.port_id}"
   }
+}
+resource "openstack_compute_instance_v2" "vlanaware_instance_legacy" {
+  name            = "vlanaware_instance_legacy"
+  security_groups = ["default"]
+  image_name	= "${var.IMAGE_NAME}"
+  flavor_name	= "${var.FLAVOR_NAME}"
+  key_pair	= "${var.SSH_KEY_NAME}"
+  availability_zone = "${lookup(var.ZONE, var.AVAILABILITY_ZONES)}"
+  network {
+    port = "${openstack_networking_port_v2.sub_port_simple.id}"
+  }
+}
+
+resource "openstack_compute_floatingip_associate_v2" "vlan_simple_floatip" {
+  floating_ip = "${openstack_networking_floatingip_v2.vlan_simple_floatip.address}"
+  instance_id = "${openstack_compute_instance_v2.vlanaware_instance_legacy.id}"
+  wait_until_associated = "true"
 }
 resource "openstack_compute_floatingip_associate_v2" "vlan_floatip" {
   floating_ip = "${openstack_networking_floatingip_v2.vlan_floatip.address}"
@@ -191,16 +223,16 @@ resource "openstack_compute_floatingip_associate_v2" "vlan_floatip" {
 
   provisioner "file"{
       source = "/home/osp_admin/OpenForm/ifcfg-eth0.220"
-      destination = "/home/centos/ifcfg-eth.220"
+      destination = "/home/centos/ifcfg-eth0.220"
   }
   provisioner "file"{
       source = "/home/osp_admin/OpenForm/router-eth0.220"
-      destination = "/home/centos/router-eth.220"
+      destination = "/home/centos/router-eth0.220"
   }
   provisioner "remote-exec" {
     inline = [
-      "sudo cp /home/centos/ifcfg-eth.220 /etc/sysconfig/network-scripts/ifcfg-eth0.220",
-      "sudo cp /home/centos/router-eth.220 /etc/sysconfig/network-scripts/router-eth0.220",
+      "sudo cp /home/centos/ifcfg-eth0.220 /etc/sysconfig/network-scripts/ifcfg-eth0.220",
+      "sudo cp /home/centos/router-eth0.220 /etc/sysconfig/network-scripts/router-eth0.220",
       "sudo ls -l /etc/sysconfig/network-scripts/",
       "sudo ifconfig",
       "sudo ls -l /etc/sysconfig/network-scripts/",
@@ -208,7 +240,7 @@ resource "openstack_compute_floatingip_associate_v2" "vlan_floatip" {
       "sudo ifup /etc/sysconfig/network-scripts/ifcfg-eth0.220",
       "sudo ifconfig",
       "ping -c 10 8.8.8.8",
-      "ping -c 10 -I eth0.220 8.8.8.8"
+      "ping -c 10 -I eth0.220 192.168.90.11"
     ]
 }
 }
