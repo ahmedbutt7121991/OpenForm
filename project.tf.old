@@ -1,0 +1,93 @@
+##SANITY TESTING SCRIPT##
+provider "openstack"{
+  user_name                     = "${var.ADMIN_USERNAME}"
+  tenant_name                   = "${var.ADMIN_TENANTNAME}"
+  password                      = "${var.OPENSTACK_ADMIN_PASSWORD}"
+  auth_url                      = "${var.HORIZON_ACCESS_URL}"
+  user_domain_name              = "Default"
+  project_domain_name           = "Default"
+  disable_no_cache_header       = true
+}
+###########################################
+#######     GENERAL ITEMS   ###############
+###########################################
+##################################
+#######     PROJECT   ############
+##################################
+#Creating a Project
+resource "openstack_identity_project_v3" "sanity_project_1" {
+  name        = "${var.SANITY_TENANTNAME}"
+  description = "Sanity Testing Project"
+}
+
+data "openstack_identity_project_v3" "sanity_project_1" {
+  name = "${var.SANITY_TENANTNAME}"
+  depends_on = ["openstack_identity_project_v3.sanity_project_1",]
+}
+
+###############################
+#######     USER   ############
+###############################
+resource "openstack_identity_user_v3" "sanity_user_1" {
+//  default_project_id = "${openstack_identity_project_v3.admin.id}"
+  default_project_id = data.openstack_identity_project_v3.sanity_project_1.id
+  name               = "${var.SANITY_USERNAME}"
+  description        = "Sanity user for Sanity Project"
+
+  password = "${var.OPENSTACK_SANITY_PASSWORD}"
+
+  ignore_change_password_upon_first_use = true
+
+//  multi_factor_auth_enabled = false
+
+//  depends_on = ["openstack_identity_project_v3.sanity_1",]
+}
+###############################
+#######     ROLE   ############
+###############################
+resource "openstack_identity_role_v3" "sanity_role_1" {
+  name = "sanity_role_1"
+}
+resource "openstack_identity_role_assignment_v3" "sanity_role_assignment_1" {
+  user_id    = "${openstack_identity_user_v3.sanity_user_1.id}"
+//  project_id = "${openstack_identity_project_v3.sanity_1.id}"
+  project_id = data.openstack_identity_project_v3.sanity_project_1.id
+  role_id    = "${openstack_identity_role_v3.sanity_role_1.id}"
+  depends_on = ["openstack_identity_role_v3.sanity_role_1",
+                "openstack_identity_user_v3.sanity_user_1",
+                "openstack_identity_project_v3.sanity_project_1",
+              ]
+}
+#Creating Flavor
+//resource "openstack_compute_flavor_v2" "sanity_flavor_1" {
+//  name  = "sanity_flavor_1"
+//  ram   = "8049"
+//  vcpus = "4"
+//  disk  = "50"
+//  is_public = true
+//
+//  extra_specs = {
+//    "hw:cpu_policy"        = "dedicated",
+//    "hw:cpu_thread_policy" = "require",
+//    "hw:mem_page_size"     = "large",
+//    "hw:numa_node"         = "1"
+//  }
+//}
+provider "openstack"{
+  alias = "sanity"
+  user_name = "${var.SANITY_USERNAME}"
+  tenant_name = "${var.SANITY_TENANTNAME}"
+  password = "${var.OPENSTACK_SANITY_PASSWORD}"
+  auth_url = "${var.HORIZON_ACCESS_URL}"
+}
+# PARENT Network Resource Creation
+resource "openstack_networking_network_v2" "parent_network" {
+  provider = "openstack.sanity"
+  name = "parent_network"
+  admin_state_up = "true"
+  segments {
+    segmentation_id   = "221"
+    network_type = "vlan"
+    physical_network = "physint"
+  }
+}
