@@ -35,5 +35,10 @@ variable "SSH_KEY_FILE"		    {}
 //    compute2 = "nova2"
 //  }
 //}
-
+variable "network" {
+  default = "public"
+}
+variable "public_network" {
+  default = "public"
+}
 data "openstack_compute_availability_zones_v2" "zones" {}

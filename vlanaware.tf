@@ -10,6 +10,48 @@ resource "openstack_compute_keypair_v2" "ssh-key" {
 ##############################################
 #######     NETWORKING ITEMS   ###############
 ##############################################
+##############################################
+#######     NETWORKING ITEMS   ###############
+##############################################
+# This will Create a ROUTER NAMED terraform_router and the resource name will be router_1
+# External network id is for PUBLIC NETWORK
+###############################################################################
+###############################################################################
+####################        PUBLIC NETWORK            #########################
+###############################################################################
+###############################################################################
+resource "openstack_networking_network_v2" "public" {                       ###
+  name           = "public"                                                 ###
+  admin_state_up = true                                                     ###
+  external = true                                                           ###
+  segments {                                                                ###
+    segmentation_id   = "604"                                               ###
+    network_type      = "vlan"                                              ###
+    physical_network  = "physext"                                           ###
+  }                                                                         ###
+}                                                                           ###
+###############################################################################
+###############################################################################
+####################        PUBLIC SUB-NETWORK            #####################
+###############################################################################
+###############################################################################
+resource "openstack_networking_subnet_v2" "external_subnet" {               ###
+  name       = "external_subnet"                                            ###
+  network_id = openstack_networking_network_v2.public.id                    ###
+  cidr       = "100.67.60.192/26"                                           ###
+  gateway_ip = "100.67.60.193"                                              ###
+  allocation_pool {                                                         ###
+    end = "100.67.60.240"                                                   ###
+    start = "100.67.60.194"                                                 ###
+  }                                                                         ###
+  enable_dhcp = false                                                       ###
+}                                                                           ###
+###############################################################################
+###############################################################################
+data "openstack_networking_network_v2" "network" {
+  depends_on = [openstack_networking_network_v2.public,]
+  name = "public"
+}
 # This will Create a ROUTER NAMED terraform_router and the resource name will be router_1
 # External network id is for PUBLIC NETWORK
 ################
@@ -17,8 +59,8 @@ resource "openstack_compute_keypair_v2" "ssh-key" {
 ################
 resource "openstack_networking_router_v2" "router_1" {
   name                = "router_1"
-//  admin_state_up      = true
-  external_network_id = "45d3d1ac-f2a8-4b69-85c0-e8cbfc7f3552"
+  admin_state_up      = true
+  external_network_id = data.openstack_networking_network_v2.network.id #"84b632fa-6721-4ce8-98c0-3a2df535f941"#openstack_networking_network_v2.public.id
 }
 ################
 ###  NETWORK ###
@@ -67,9 +109,7 @@ resource "openstack_networking_subnet_v2" "sub_subnet" {
 ################
 #Creating Port parent
 resource "openstack_networking_port_v2" "parent_port" {
-  depends_on = [
-    openstack_networking_subnet_v2.parent_subnet,
-  ]
+  depends_on = [openstack_networking_subnet_v2.parent_subnet,]
 
   name           = "parent_port"
   network_id     = openstack_networking_network_v2.parent_network.id
@@ -82,9 +122,7 @@ resource "openstack_networking_port_v2" "parent_port" {
 }
 #Creating Sub port
 resource "openstack_networking_port_v2" "sub_port" {
-  depends_on = [
-    openstack_networking_subnet_v2.sub_subnet,
-  ]
+  depends_on = [openstack_networking_subnet_v2.sub_subnet,]
 
   name           = "sub_port"
   network_id     = openstack_networking_network_v2.sub_network.id
@@ -97,9 +135,7 @@ resource "openstack_networking_port_v2" "sub_port" {
 }
 #Creating Sub Port for simple vm on Sub network
 resource "openstack_networking_port_v2" "sub_port_simple" {
-  depends_on = [
-    openstack_networking_subnet_v2.sub_subnet,
-  ]
+  depends_on = [openstack_networking_subnet_v2.sub_subnet,]
 
   name           = "sub_port_simple"
   network_id     = openstack_networking_network_v2.sub_network.id
@@ -140,10 +176,10 @@ resource "openstack_networking_trunk_v2" "trunk_1" {
 ######################
 #Creating floating ip
 resource "openstack_networking_floatingip_v2" "vlan_floatip" {
-  pool = "public"
+  pool = data.openstack_networking_network_v2.network.name
 }
 resource "openstack_networking_floatingip_v2" "subnetwork_floatip" {
-  pool = "public"
+  pool = data.openstack_networking_network_v2.network.name
 }
 ###########################################
 #######     COMPUTE ITEMS   ###############
@@ -158,7 +194,7 @@ resource "openstack_compute_instance_v2" "vlanaware_instance_1" {
   flavor_name	= var.FLAVOR_NAME
   key_pair	= var.SSH_KEY_NAME
 //  availability_zone = lookup(var.ZONE, var.AVAILABILITY_ZONES)
-  availability_zone = data.openstack_compute_availability_zones_v2.zones.names[0]
+  availability_zone = data.openstack_compute_availability_zones_v2.zones.names.0
   network {
     port = openstack_networking_trunk_v2.trunk_1.port_id
   }
@@ -215,7 +251,7 @@ resource "openstack_compute_instance_v2" "subnetwork_instance_1" {
   flavor_name	= var.FLAVOR_NAME
   key_pair	= var.SSH_KEY_NAME
 //  availability_zone = lookup(var.ZONE, var.AVAILABILITY_ZONES)
-  availability_zone = data.openstack_compute_availability_zones_v2.zones.names[1]
+  availability_zone = data.openstack_compute_availability_zones_v2.zones.names.1
   network {
     port = openstack_networking_port_v2.sub_port_simple.id
   }
