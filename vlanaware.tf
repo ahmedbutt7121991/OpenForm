@@ -7,6 +7,39 @@ resource "openstack_compute_keypair_v2" "ssh-key" {
   name = "ssh-key"
   public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDgR8LqMUAHATFZMbeyo4OobarANGKq+EtNNdmI2aunpM8vUR56xqi9Wp4I2PmYCJb+EOAmK9+hAnPOBHeCP1N5Xtmi3yastQKIFuQM3A6ZUNP5g0CLVdYCwUmLfzPw7nsBfBeFKU1qkKe39+7Kfoal/pTyhX9HcXS2NiMs/1PVsLcVcnKnqP2R0peQ1c3uhgMI0GJ4OhLB6AVXKAf/hmkEug8GY4SVup5YL2kIHaC1QGY5rFMMzgkEnp3uIBQzMGLZ/0zRDINiAJsXOMSWcOv4xyn1cqKdAr/MRh00ABo45XzsvsSm/DiyjfhC6jP2w7keleS0bikTGWfqEccXBCxN osp_admin@director.r60.lab"
 }
+####################
+###SECURITY GROUP###
+####################
+resource "openstack_networking_secgroup_v2" "secgroup_1" {
+  name        = "secgroup_1"
+  description = "admin neutron security group"
+}
+##########################
+###SECURITY GROUP RULES###
+##########################
+resource "openstack_networking_secgroup_rule_v2" "tcp_ingress_secgroup_rules" {
+  direction = "ingress"
+  ethertype = "IPv4"
+  protocol = "tcp"
+  port_range_min = 22
+  port_range_max = 22
+  remote_ip_prefix = "0.0.0.0/0"
+  security_group_id = openstack_networking_secgroup_v2.secgroup_1.id
+}
+resource "openstack_networking_secgroup_rule_v2" "icmp_ingress_secgroup_rules" {
+  direction = "ingress"
+  ethertype = "IPv4"
+  protocol = "icmp"
+  remote_ip_prefix = "0.0.0.0/0"
+  security_group_id = openstack_networking_secgroup_v2.secgroup_1.id
+}
+resource "openstack_networking_secgroup_rule_v2" "icmp_egress_secgroup_rules" {
+  direction = "egress"
+  ethertype = "IPv4"
+  protocol = "icmp"
+  remote_ip_prefix = "0.0.0.0/0"
+  security_group_id = openstack_networking_secgroup_v2.secgroup_1.id
+}
 ##############################################
 #######     NETWORKING ITEMS   ###############
 ##############################################
@@ -114,7 +147,7 @@ resource "openstack_networking_port_v2" "parent_port" {
   name           = "parent_port"
   network_id     = openstack_networking_network_v2.parent_network.id
 //  admin_state_up = "true"
-
+  security_group_ids = [openstack_networking_secgroup_v2.secgroup_1.id,]
     fixed_ip {
     subnet_id  =  openstack_networking_subnet_v2.parent_subnet.id
     ip_address = "192.168.70.10"
@@ -127,6 +160,7 @@ resource "openstack_networking_port_v2" "sub_port" {
   name           = "sub_port"
   network_id     = openstack_networking_network_v2.sub_network.id
 //  admin_state_up = "true"
+  security_group_ids = [openstack_networking_secgroup_v2.secgroup_1.id,]
   mac_address = openstack_networking_port_v2.parent_port.mac_address
     fixed_ip {
     subnet_id  =  openstack_networking_subnet_v2.sub_subnet.id
@@ -140,7 +174,7 @@ resource "openstack_networking_port_v2" "sub_port_simple" {
   name           = "sub_port_simple"
   network_id     = openstack_networking_network_v2.sub_network.id
 //  admin_state_up = "true"
-
+security_group_ids = [openstack_networking_secgroup_v2.secgroup_1.id,]
     fixed_ip {
     subnet_id  =  openstack_networking_subnet_v2.sub_subnet.id
     ip_address = "192.168.90.11"
